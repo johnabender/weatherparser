@@ -12,13 +12,38 @@ var toType = function( obj )
 }
 
 
-var conString = process.env.MONGOHQ_URL;
-if (!conString) {conString = "mongodb://heroku:578309da53dca6e296339c0c963e0c01@alex.mongohq.com:10093/app7191499";}
+var conString = process.env.MONGOHQ_URL || "mongodb://heroku:ab903766cb8092db28fe944a93d2db5c@linus.mongohq.com:10061/app10671617"
 
 var db = mongo.db(conString, {
      auto_reconnect: true,
-     poolSize: 5
+     poolSize: 5,
+     safe: false
 });
+
+// get a list of all documents currently in the db so we can delete them later
+var existingDocuments = []
+
+db.collection( 'currentForecast' ).find( {} ).toArray( function( err, result )
+{
+    if( err ) { console.log( err ) }
+    else {
+        for( var i = 0; i < result.length; i++ ) {
+            existingDocuments.push( result[i]._id )
+        }
+    }
+})
+
+var deleteDocumentsByID = function( documentIDs, callback )
+{
+    db.collection( 'currentForecast' ).remove( { _id: {$in: documentIDs} }, {}, function( err, result )
+    {
+        db.collection( 'currentForecast' ).find( {} ).toArray( function( err, result )
+        {
+            callback()
+        })
+    })
+}
+
 
 
 var hostName = 'nomads.ncep.noaa.gov'
@@ -39,10 +64,12 @@ if( h < 0 ) {
 }
 var hourString = (h < 10? '0' : '' ) + h.toString()
 
-var variables = ['tmin2m', 'tmax2m']
+// see http://nomads.ncep.noaa.gov:9090/dods/gens/gens20130104 (or recent date)
+var variables = ['tmin2m', 'tmax2m', 'apcpsfc', 'csnowsfc', 'crainsfc']
 var latitudes = [136]
 var longitudes = [249]
 
+var requestsOutstanding = 0
 for( var v = 0; v < variables.length; v++ ) {
     var variable = variables[v]
     for( var la = 0; la < latitudes.length; la++ ) {
@@ -54,6 +81,7 @@ for( var v = 0; v < variables.length; v++ ) {
             queryPath += ensembleName + '_' + hourString + 'z.ascii?' + variable
             queryPath += '[0:20][1:64][' + lat + ':' + lat + '][' + lon + ':' + lon + ']'
             console.log( queryPath )
+            requestsOutstanding++
             var req = http.request( {hostname: hostName, port: portNumber, path: queryPath}, function( res )
             {
                 var data = ''
@@ -66,7 +94,21 @@ for( var v = 0; v < variables.length; v++ ) {
                 {
                     parseDataString( data, function( parsed )
                     {
-                        console.log( parsed )
+                        db.collection( 'currentForecast' ).save( parsed, {upsert: true}, function( err, result )
+                        {
+                            console.log( parsed.variable + ' returned' )
+                            if( err ) { console.log( err ) }
+
+                            if( --requestsOutstanding === 0 ) {
+                                console.log( 'last request finished' )
+
+                                // delete documents that were in the db before, so only current ones remain
+                                deleteDocumentsByID( existingDocuments, function()
+                                {
+                                    process.exit( 0 )
+                                })
+                            }
+                        })
                     })
                 })
             })
@@ -141,3 +183,16 @@ var parseDataString = function( string, callback )
 
     callback( data )
 }
+
+
+var quitFunction = function()
+{
+    db.close( function()
+    {
+        console.log( 'updateData closed its database' )
+    })
+}
+
+process.on( 'SIGINT', quitFunction )
+process.on( 'exit', quitFunction )
+
