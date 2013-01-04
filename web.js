@@ -8,8 +8,7 @@ var ObjectID = require('mongodb').ObjectID;  // Get the objectID type
 
 
 app.get('/', function(request, response) {
-  response.send( process.env.MONGOHQ_URL )
-
+  response.send( process.env.MONGOHQ_URL || "hello, world" )
 });
 
 var port = process.env.PORT || 5000;
