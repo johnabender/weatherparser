@@ -7,7 +7,7 @@ var mongo = require('mongoskin');
 var mongodb = require('mongodb');   // just to get the ObjectID type, use the skin for everything else
 var ObjectID = require('mongodb').ObjectID;  // Get the objectID type
 
-var conString = process.env.MONGOHQ_URL || "mongodb://heroku:ab903766cb8092db28fe944a93d2db5c@linus.mongohq.com:10061/app10671617"
+var conString = process.env.MONGOHQ_URL
 
 var db = mongo.db(conString, {
      auto_reconnect: true,
