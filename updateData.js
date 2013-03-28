@@ -65,7 +65,7 @@ if( h < 0 ) {
 var hourString = (h < 10? '0' : '' ) + h.toString()
 
 // see http://nomads.ncep.noaa.gov:9090/dods/gens/gens20130104 (or recent date)
-var variables = ['tmin2m', 'tmax2m', 'apcpsfc', 'csnowsfc', 'crainsfc']
+var variables = ['tmin2m', 'tmax2m', 'apcpsfc', 'csnowsfc', 'crainsfc', 'sunsdsfc']
 var latitudes = [136]
 var longitudes = [249]
 
